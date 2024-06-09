@@ -76,7 +76,7 @@ int main() {
                 sf::Vector2i mousePos = sf::Mouse::getPosition(window);
 
                 if (solveButton.isMe(mousePos)) {
-                    if (sd.solve())
+                    if (sd.solve(window))
                         std::cout << "Solved" << std::endl;
                     else
                         std::cout << "Not Solved" << std::endl;
@@ -99,11 +99,14 @@ int main() {
 
         }
 
+        window.clear(sf::Color(0x000000ff));
+
         solveButton.paint(window);
         saveButton.paint(window);
         loadButton.paint(window);
         resetButton.paint(window);
 
+        sd.drawNumbers(window);
         sd.drawGrid(window);
 
         window.display();

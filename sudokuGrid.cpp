@@ -16,30 +16,6 @@ using json = nlohmann::json;
 void Sudoku::drawGrid(sf::RenderWindow &window) {
     int spacing = window.getSize().y / 9;
 
-    //drawing all the numbers
-    for (int i = 0; i < 9; ++i) {
-        for (int j = 0; j < 9; ++j) {
-            sf::Vector2f fieldPos   (spacing * i, spacing * j);
-            sf::Vector2f fieldSize  (spacing, spacing);
-            fields[i][j].setSize(fieldSize);
-            fields[i][j].setPos(fieldPos);
-
-            // Check if the current field is the active field
-            if (&fields[i][j] == activeField) {
-                // Set its color to green
-                fields[i][j].setColour(sf::Color::Green);
-            } else {
-                // Set its color to black
-                fields[i][j].setColour(sf::Color::Black);
-            }
-
-            if (fields[i][j].getText() == "0") {
-                fields[i][j].setText("");
-            }
-
-            fields[i][j].paint(window);
-        }
-    }
 
     for (int i = 1; i < 9; ++i) {
         sf::VertexArray line(sf::LineStrip, 2);
@@ -52,6 +28,9 @@ void Sudoku::drawGrid(sf::RenderWindow &window) {
         if (i%3 == 0) {
             line[0].color = sf::Color::Red;
             line[1].color = sf::Color::Red;
+        } else {
+            line[0].color = sf::Color::White;
+            line[1].color = sf::Color::White;
         }
 
 
@@ -70,11 +49,49 @@ void Sudoku::drawGrid(sf::RenderWindow &window) {
         if (i%3 == 0) {
             line[0].color = sf::Color::Red;
             line[1].color = sf::Color::Red;
+        } else {
+            line[0].color = sf::Color::White;
+            line[1].color = sf::Color::White;
         }
 
         window.draw(line);
     }
+}
 
+void Sudoku::drawNumbers(sf::RenderWindow &window) {
+    int spacing = window.getSize().y / 9;
+
+    //drawing all the numbers
+    for (int i = 0; i < 9; ++i) {
+        for (int j = 0; j < 9; ++j) {
+            sf::Vector2f fieldPos   (spacing * i, spacing * j);
+            sf::Vector2f fieldSize  (spacing, spacing);
+            fields[i][j].setSize(fieldSize);
+            fields[i][j].setPos(fieldPos);
+
+            // Check if the current field is the active field
+            if (&fields[i][j] == activeField) {
+                // Set its color to green
+                fields[i][j].setColour(sf::Color::Green);
+            } else {
+                    // Set its color to transparent
+                    fields[i][j].setColour(sf::Color::Transparent);
+            }
+
+            if (fields[i][j].isFixed()) {
+                fields[i][j].setColour(sf::Color(0x325aafff));
+            } else {
+                fields[i][j].setColour(sf::Color(0x000000ff));
+            }
+
+            if (fields[i][j].getText() == "0" || fields[i][j].getText() == "") {
+                fields[i][j].setText("");
+                fields[i][j].setFixed(false);
+            }
+
+            fields[i][j].paint(window);
+        }
+    }
 }
 
 void Sudoku::handleInput(sf::Event& event, sf::RenderWindow& window) {
@@ -86,7 +103,6 @@ void Sudoku::handleInput(sf::Event& event, sf::RenderWindow& window) {
                 if (fields[i][j].isMe(mousePos)) {
                     // Activate the field for input
                     activeField = &fields[i][j];
-                    updatePossibleNumbers(i, j);
                     return;
                 }
             }
@@ -95,6 +111,7 @@ void Sudoku::handleInput(sf::Event& event, sf::RenderWindow& window) {
         if (event.text.unicode >= '0' && event.text.unicode <= '9') {
             // Update the text of the active field with the typed number
             activeField->setText(std::to_string(event.text.unicode - '0'));
+            activeField->setFixed(true);
         } else if (event.text.unicode == 13) { // Enter key pressed
             // Finish input, deactivate the field
             activeField = nullptr;
@@ -103,97 +120,71 @@ void Sudoku::handleInput(sf::Event& event, sf::RenderWindow& window) {
 }
 
 
-void Sudoku::updatePossibleNumbers(int x, int y) {
-    if (fields[x][y].getText() != "") {
-        fields[x][y].setPossibleNumbers(std::vector<int>({std::stoi(fields[x][y].getText())}));
-        return;
-    }
-
-
-    // Reset possible numbers to 1-9
-    std::vector<int> possibleNumbers = {1, 2, 3, 4, 5, 6, 7, 8, 9};
-
-    // Cross off numbers from the same 3x3 chunk
-    int chunk_x = x / 3;
-    int chunk_y = y / 3;
-    int startX = chunk_x * 3;
-    int startY = chunk_y * 3;
-
-    for (int i = startX; i < startX + 3; ++i) {
-        for (int j = startY; j < startY + 3; ++j) {
-            if (fields[i][j].getText() != "") {
-                int number = std::stoi(fields[i][j].getText());
-                possibleNumbers.erase(std::remove(possibleNumbers.begin(), possibleNumbers.end(), number),possibleNumbers.end());
-            }
-        }
-    }
-
-    // Cross off numbers from the same row
+bool Sudoku::isValid(int row, int col, const std::string& value) {
+    // Check the row
     for (int j = 0; j < 9; ++j) {
-        if (fields[x][j].getText() != "") {
-            int number = std::stoi(fields[x][j].getText());
-            possibleNumbers.erase(std::remove(possibleNumbers.begin(), possibleNumbers.end(), number),possibleNumbers.end());
-        }
+        if (fields[row][j].getText() == value) return false;
     }
-
-    // Cross off numbers from the same column
+    // Check the column
     for (int i = 0; i < 9; ++i) {
-        if (fields[i][y].getText() != "") {
-            int number = std::stoi(fields[i][y].getText());
-            possibleNumbers.erase(std::remove(possibleNumbers.begin(), possibleNumbers.end(), number),possibleNumbers.end());
+        if (fields[i][col].getText() == value) return false;
+    }
+    // Check the 3x3 grid
+    int startRow = (row / 3) * 3;
+    int startCol = (col / 3) * 3;
+    for (int i = startRow; i < startRow + 3; ++i) {
+        for (int j = startCol; j < startCol + 3; ++j) {
+            if (fields[i][j].getText() == value) return false;
         }
     }
-
-    fields[x][y].setPossibleNumbers(possibleNumbers);
-
-
-    std::cout << "[";
-    for (size_t i = 0; i < possibleNumbers.size(); ++i) {
-        std::cout << possibleNumbers[i];
-        if (i < possibleNumbers.size() - 1) {
-            std::cout << ", ";
-        }
-    }
-    std::cout << "]" << std::endl;
+    return true;
 }
 
-bool Sudoku::solve() {
-    while (true) {
-        bool progress = false;
-
-        // Iterate through each cell
-        for (int i = 0; i < 9; ++i) {
-            for (int j = 0; j < 9; ++j) {
-                // If the cell is empty
-                if (fields[i][j].getText().empty()) {
-                    // Update possible numbers for the cell
-                    updatePossibleNumbers(i, j);
-
-                    // If only one possible number, fill in the cell
-                    if (fields[i][j].getPossibleNumbers().size() == 1) {
-                        fields[i][j].setText(std::to_string(fields[i][j].getPossibleNumbers()[0]));
-                        progress = true;
-                    }
-                }
-            }
-        }
-
-        // If no progress made in this iteration, break the loop
-        if (!progress) {
-            break;
-        }
-    }
-
-    // Check if the puzzle is solved
-    // If any cell is empty, the puzzle is not solved
+bool Sudoku::solve(sf::RenderWindow& window) {
+    // Step 1: Find the first empty cell
     for (int i = 0; i < 9; ++i) {
         for (int j = 0; j < 9; ++j) {
-            if (fields[i][j].getText().empty()) {
+            if (fields[i][j].getText() == "") { // Empty cell found
+                // Step 2: Try each number from 1 to 9
+                for (int num = 1; num <= 9; ++num) {
+                    std::string numStr = std::to_string(num);
+                    // Step 3: Check validity of the number
+                    if (isValid(i, j, numStr)) {
+                        // Valid number, place it in the cell
+                        fields[i][j].setText(numStr);
+
+                        //fields[i][j].paint(window);
+                        //window.display();
+
+                        // Step 4: Recursively attempt to solve the rest of the grid
+                        if (solve(window)) {
+                            return true; // Solved
+                        }
+                        // Step 5: If not solved, backtrack by resetting the cell
+                        fields[i][j].setText("");
+
+                        //fields[i][j].setColour(sf::Color::Black);
+                        //fields[i][j].paint(window);
+                        //drawGrid(window);
+                        //window.display();
+
+                    }
+                }
+
+
+                sf::Event event;
+
+                while (window.pollEvent(event)) {
+                    if (event.type == sf::Event::Closed)
+                        window.close();
+                }
+
+                // If no valid number found, return false to trigger backtracking
                 return false;
             }
         }
     }
-
+    // Step 6: If no empty cell is found, the puzzle is solved
     return true;
 }
 
@@ -248,7 +239,8 @@ void Sudoku::saveBoard() {
 
     for (int i = 0; i < 9; ++i) {
         for (int j = 0; j < 9; ++j) {
-            data[i][j] = fields[i][j].getText();
+            data["numbers"][i][j] = fields[i][j].getText();
+            data["fixed"][i][j] = fields[i][j].isFixed();
         }
     }
 
@@ -273,8 +265,10 @@ void Sudoku::loadBoard() {
     // Update the Sudoku board with the loaded data
     for (int i = 0; i < 9; ++i) {
         for (int j = 0; j < 9; ++j) {
-            std::string fieldValue = data[i][j].get<std::string>(); // Get the field value from JSON
+            std::string fieldValue = data["numbers"][i][j].get<std::string>(); // Get the field value from JSON
             fields[i][j].setText(fieldValue); // Update the corresponding SudokuField object
+
+            fields[i][j].setFixed(data["fixed"][i][j].get<bool>());
         }
     }
 
